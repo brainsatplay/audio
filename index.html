@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Brains@Play Template Device</title>
+    <script src="https://cdn.jsdelivr.net/npm/datastreams-api"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@brainsatplay/audio"></script> -->
+    <script src="./dist/index.js"></script>
+
+</head>
+<body>
+    <button>Connect to Device</button>
+    <div></div>
+
+
+    <script type="module">
+
+        import * as components from 'https://cdn.jsdelivr.net/npm/brainsatplay-ui/dist/index.esm.js'
+
+        // ------------------------------------------------
+        // Test the Library on the Data Capture and Streams API (latest)
+        // ------------------------------------------------
+        
+        // // Optional: Import using ES6 Syntax
+        // import device from './dist/module.js'
+
+        // Create DataDevices Instance
+        const dataDevices = new datastreams.DataDevices()
+
+        // Monitor Volume
+        const volume = new components.streams.audio.Volume()
+        document.body.insertAdjacentElement('beforeend', volume)
+        const spectrogram = new components.streams.data.Spectrogram()
+        const timeseries = new components.streams.data.TimeSeries()
+        document.body.insertAdjacentElement('beforeend', spectrogram)
+        document.body.insertAdjacentElement('beforeend', timeseries)
+
+        // Press Button to Connect Device
+        const button = document.body.querySelector('button')
+        const div = document.body.querySelector('div')
+        
+        button.onclick = async () => {
+
+            // Option A: Load device then filter for it (no config required for only device)
+            dataDevices.load(device)
+            const activeDevice = await dataDevices.getUserDevice({label: 'audio'})
+
+            // Option B: Pass the device directly
+            // const device = await dataDevices.getUserDevice(device)
+
+            console.log('Device', activeDevice)
+
+            // Subscribe to Tracks in the Device Data Stream
+            activeDevice.stream.tracks.forEach((t,i) => {
+                const readout = document.createElement('p')
+                const strong = document.createElement('strong')
+                strong.innerHTML = `Track ${t.contentHint}: `
+                const span = document.createElement('span')
+                readout.insertAdjacentElement('beforeend', strong)
+                readout.insertAdjacentElement('beforeend', span)
+                div.insertAdjacentElement('beforeend', readout)
+                t.subscribe((data) => {
+                    span.innerHTML = data
+                })
+            })
+
+            // Show Audio Volume
+            let volumeCallback = null;
+            let volumeInterval = null;
+            const frequencies = new Uint8Array(activeDevice.device.analyser.frequencyBinCount);
+            let raw = new Uint8Array(1) // Only get the latest
+
+            volumeCallback = () => {
+                activeDevice.device.analyser.getByteFrequencyData(frequencies);
+
+              let volumeSum = 0;
+              for (const volume of frequencies) volumeSum += volume;
+              const averageVolume = volumeSum / frequencies.length;
+              volume.volume = (averageVolume / (activeDevice.device.analyser.maxDecibels - activeDevice.device.analyser.minDecibels))
+
+              activeDevice.device.analyser.getByteTimeDomainData(raw)
+                const arr = Array.from(raw)
+                timeseries.data = [arr]
+                spectrogram.data = Array.from(frequencies)
+            };
+
+            if (volumeCallback !== null && volumeInterval === null) volumeInterval = setInterval(volumeCallback, 100);
+        }
+
+        
+    </script>
+    
+</body>
+</html>
